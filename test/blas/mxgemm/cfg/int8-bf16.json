@@ -1,0 +1,26 @@
+// Minimal, known-good mxgemm config.
+// It follows the same JSON5-style syntax as the kernel's default params.
+
+{
+    setup_ssr: 1,
+    parallelize_m: 0,
+    parallelize_k: 0,
+    m_tiles: 1,
+    n_tiles: 1,
+    k_tiles: 1,
+    load_a: 1,
+    load_b: 1,
+    load_c: 1,
+    transa: false,
+    transb: true,
+    M: 16,
+    N: 32,
+    K: 32,
+    block_size: 16,
+    alpha: 1,
+    beta: 0,
+    gemm_fp: "mxgemm_fp8_opt_ex",
+    src_type: "INT8",
+    dst_type: "BF16",
+    dual_ssr: true
+}

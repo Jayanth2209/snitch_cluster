@@ -11,15 +11,31 @@ so it inherits the same command-line interface.
 """
 
 from pathlib import Path
+import shutil
 import sys
 
 from snitch.util.sim import sim_utils, Simulator
 
+
+def _which_or_default(*candidates: str) -> str:
+    for candidate in candidates:
+        if shutil.which(candidate):
+            return candidate
+    return candidates[0]
+
 SIMULATORS = {
-    'vsim': Simulator.QuestaSimulator('snitch_cluster.vsim'),
-    'vcs': Simulator.VCSSimulator('snitch_cluster.vcs'),
-    'verilator': Simulator.VerilatorSimulator('snitch_cluster.vlt'),
-    'gvsoc': Simulator.GvsocSimulator('snitch_cluster.gvsoc')
+    'vsim': Simulator.QuestaSimulator(
+        _which_or_default('snitch_cluster.vsim', 'cluster_tile.vsim')
+    ),
+    'vcs': Simulator.VCSSimulator(
+        _which_or_default('snitch_cluster.vcs', 'cluster_tile.vcs')
+    ),
+    'verilator': Simulator.VerilatorSimulator(
+        _which_or_default('snitch_cluster.vlt', 'cluster_tile.vlt')
+    ),
+    'gvsoc': Simulator.GvsocSimulator(
+        _which_or_default('snitch_cluster.gvsoc', 'cluster_tile.gvsoc')
+    )
 }
 
 
