@@ -21,6 +21,7 @@ work.lib++/
 .vscode/
 __pycache__
 gmon.out
+logs/
 
 # Docs
 /site/

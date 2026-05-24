@@ -30,7 +30,8 @@ dependencies:
   idma: 0.6.5
   axi:                { git: https://github.com/colluca/axi.git,                      rev:      multicast   }
   common_cells:       { git: https://github.com/pulp-platform/common_cells.git,       rev:      snitch      }
-  FPnew:              { git: https://github.com/gamzeisl/cvfpu.git,              rev:      d1c4603d117da3190641b7cff3f58b8ec5ac25cf }
+  FPnew:              { git: https://github.com/Jayanth2209/cvfpu.git,                rev:      eeb0874de8df8acf493058bf7994ae3383240937 }
+  mxcore:             { path: ../../mxcore/mxcore-rtl/ }
 
 export_include_dirs:
   - hw/reqrsp_interface/include
@@ -205,6 +206,8 @@ sources:
   - target: all(snitch_cluster_wrapper, not(netlist))
     files:
       - hw/generated/snitch_cluster_wrapper.sv
+      - hw/snitch_cluster/src/snitch_hwpe_subsystem.sv
+      - hw/snitch_cluster/src/cluster_tile.sv
   - target: all(snitch_cluster_wrapper, gf12, netlist)
     files:
       - nonfree/gf12/fusion/runs/0/out/15/snitch_cluster_wrapper.v

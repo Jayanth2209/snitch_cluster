@@ -11,7 +11,7 @@
 #######################
 
 DEBUG        ?= OFF  # ON to turn on debugging symbols and wave logging
-CFG_OVERRIDE ?=      # Override default configuration file
+CFG_OVERRIDE ?= $(SN_ROOT)/cfg/mxcore.json  # Override default configuration file
 TECH         ?=      # [gf12, ihp13] for physical simulation
 VCD_DUMP     ?= 0    # 1 to dump VCD traces
 
@@ -44,8 +44,8 @@ SN_ROOT := $(realpath $(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
 include $(SN_ROOT)/make/common.mk
 
-TARGET = snitch_cluster
-SN_COMMON_BENDER_FLAGS += -t snitch_cluster_wrapper
+TARGET = cluster_tile
+SN_COMMON_BENDER_FLAGS += -t snitch_cluster_wrapper -t mxcore_hwpe
 
 #################
 # Configuration #
