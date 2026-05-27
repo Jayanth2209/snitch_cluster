@@ -44,6 +44,7 @@
             lat_noncomp: 1,
             lat_conv: 2,
             lat_sdotp: 3,
+            lat_mxdotp: 3,
             fpu_pipe_config: "BEFORE",
             narrow_xbar_latency: "CUT_ALL_PORTS",
             wide_xbar_latency: "CUT_ALL_PORTS",
@@ -104,6 +105,7 @@
         xf8alt: true,
         xfdotp: true,
         xfvec: true,
+        xfmxdotp: true,
         ssr_nr_credits: 4,
         num_int_outstanding_loads: 4,
         num_int_outstanding_mem: 4,
@@ -116,10 +118,12 @@
         // SSSR configuration below
         ssr_intersection: true,
         ssr_intersection_triple: [0, 1, 2],
+        // 4 SSRs for MXDOTP
         ssrs: [
             {indirection: true},    // Master 0
             {indirection: true},    // Master 1
-            {},                     // Slave
+            {rpt_width: 6},         // Slave
+            {rpt_width: 6},
         ],
     },
     dma_core_template: {
@@ -133,6 +137,7 @@
         xf8: false,
         xf8alt: false,
         xfdotp: false,
+        xfmxdotp: false,
         xfvec: false,
         num_int_outstanding_loads: 4,
         num_int_outstanding_mem: 4,

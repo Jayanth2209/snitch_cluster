@@ -119,6 +119,7 @@ module fixture_ssr_streamer import snitch_ssr_pkg::*; #(
 
   snitch_ssr_streamer #(
     .NumSsrs      ( NumSsrs     ),
+    .NumMemSsrs   ( NumSsrs     ),
     .RPorts       ( RPorts      ),
     .WPorts       ( WPorts      ),
     .AddrWidth    ( AddrWidth   ),

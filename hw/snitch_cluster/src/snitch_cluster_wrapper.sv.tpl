@@ -84,6 +84,11 @@ module ${cfg['cluster']['name']}_wrapper (
   localparam int unsigned NumSequencerInstr [${cfg['cluster']['nr_cores']}] = '{${core_cfg('num_sequencer_instructions')}};
   localparam int unsigned NumSequencerLoops [${cfg['cluster']['nr_cores']}] = '{${core_cfg('num_sequencer_loops')}};
   localparam int unsigned NumSsrs [${cfg['cluster']['nr_cores']}] = '{${core_cfg('num_ssrs')}};
+  localparam int unsigned NumMemSsrs [${cfg['cluster']['nr_cores']}] = '{
+% for c in cfg['cluster']['cores']:
+    ${ (c['num_ssrs'] - 1) if (c['xfmxdotp'] and c['num_ssrs'] == 4) else c['num_ssrs'] }${ ',' if not loop.last else '' }
+% endfor
+  };
   localparam int unsigned SsrMuxRespDepth [${cfg['cluster']['nr_cores']}] = '{${core_cfg('ssr_mux_resp_depth')}};
 
   // Snitch cluster under test.
@@ -147,6 +152,7 @@ module ${cfg['cluster']['name']}_wrapper (
     .XF8ALT (${core_cfg_flat('xf8alt')}),
     .XFVEC (${core_cfg_flat('xfvec')}),
     .XFDOTP (${core_cfg_flat('xfdotp')}),
+    .XFMXDOTP (${core_cfg_flat('xfmxdotp')}),
     .Xdma (${core_cfg_flat('xdma')}),
     .Xssr (${core_cfg_flat('xssr')}),
     .Xfrep (${core_cfg_flat('xfrep')}),
@@ -172,6 +178,7 @@ module ${cfg['cluster']['name']}_wrapper (
     .NumITLBEntries (NumITLBEntries),
     .NumSsrsMax (${cfg['cluster']['num_ssrs_max']}),
     .NumSsrs (NumSsrs),
+    .NumMemSsrs (NumMemSsrs),
     .SsrMuxRespDepth (SsrMuxRespDepth),
     .SsrRegs (${cfg['cluster']['name']}_pkg::SsrRegs),
     .SsrCfgs (${cfg['cluster']['name']}_pkg::SsrCfgs),

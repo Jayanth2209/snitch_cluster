@@ -37,6 +37,7 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
   parameter bit          XDivSqrt  = 0,
   parameter bit          XFVEC     = 0,
   parameter bit          XFDOTP    = 0,
+  parameter bit          XFMXDOTP  = 0,
   parameter bit          XFAUX     = 0,
   int unsigned           FLEN      = DataWidth,
   /// Enable virtual memory support.
@@ -147,6 +148,7 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
   // FPU **un-timed** Side-channel
   output fpnew_pkg::roundmode_e     fpu_rnd_mode_o,
   output fpnew_pkg::fmt_mode_t      fpu_fmt_mode_o,
+  output logic                      fpu_dual_ssr_o,
   input  fpnew_pkg::status_t        fpu_status_i,
   /// Consistency Address Queue (CAQ) interface.
   /// Used by FPU to notify Snitch LSU of retired loads/stores.
@@ -393,6 +395,7 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
   `FFAR(csr_user_low_q, csr_user_low_d, '0, clk_i, rst_i)
 
   typedef struct packed {
+    logic                  fdualssr;
     fpnew_pkg::fmt_mode_t  fmode;
     fpnew_pkg::roundmode_e frm;
     fpnew_pkg::status_t    fflags;
@@ -401,6 +404,7 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
 
   assign fpu_rnd_mode_o = fcsr_q.frm;
   assign fpu_fmt_mode_o = fcsr_q.fmode;
+  assign fpu_dual_ssr_o = fcsr_q.fdualssr;
 
   // Registers
   `FFAR(pc_q, pc_d, BootAddr, clk_i, rst_i)
@@ -2078,6 +2082,23 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
           illegal_inst = 1'b1;
         end
       end
+      // MXDOTP,
+      MXDOTP_B0,
+      MXDOTP_B1,
+      MXDOTP_B2,
+      MXDOTP_B3: begin
+        if (FP_EN && FLEN >= 64 && XFMXDOTP) begin // TODO: Check src data types
+          if (fcsr_q.fmode.dst == 1'b0 ||
+              (XF16ALT && fcsr_q.fmode.dst == 1'b1)) begin
+            write_rd = 1'b0;
+            is_acc_inst = 1'b1;
+          end else begin
+            illegal_inst = 1'b1;
+          end
+        end else begin
+          illegal_inst = 1'b1;
+        end
+      end
       // Offload FP-Int Instructions - fire and forget
       // Double Precision Floating-Point
       FLE_D,
@@ -3281,8 +3302,8 @@ module snitch import snitch_pkg::*; import riscv_instr::*; #(
           end
           CSR_FCSR: begin
             if (FP_EN) begin
-              csr_rvalue = {22'b0, fcsr_q};
-              if (!exception) fcsr_d = fcsr_t'(alu_result[9:0]);
+              csr_rvalue = {21'b0, fcsr_q};
+              if (!exception) fcsr_d = fcsr_t'(alu_result[10:0]);
             end else illegal_csr = 1'b1;
           end
           // HW cluster barrier

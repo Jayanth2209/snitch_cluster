@@ -28,6 +28,7 @@ module snitch_fp_ss import snitch_pkg::*; #(
   parameter bit Xssr = 1,
   parameter bit Xcopift = 1,
   parameter int unsigned NumSsrs = 0,
+  parameter int unsigned NumMemSsrs = 0,
   parameter logic [NumSsrs-1:0][4:0]  SsrRegs = '0,
   parameter type acc_req_t = logic,
   parameter type acc_resp_t = logic,
@@ -38,6 +39,7 @@ module snitch_fp_ss import snitch_pkg::*; #(
   parameter bit XF8 = 0,
   parameter bit XF8ALT = 0,
   parameter bit XFVEC = 0,
+  parameter bit XFMXDOTP = 0,
   parameter int unsigned FLEN = DataWidth,
   parameter bit EnableDca = 0,
   /// Derived parameter *Do not override*
@@ -82,6 +84,7 @@ module snitch_fp_ss import snitch_pkg::*; #(
   // FPU **un-timed** Side-channel
   input  fpnew_pkg::roundmode_e fpu_rnd_mode_i,
   input  fpnew_pkg::fmt_mode_t  fpu_fmt_mode_i,
+  input  logic                  fpu_dual_ssr_i,
   output fpnew_pkg::status_t    fpu_status_o,
   // SSR Interface
   output logic  [2:0][4:0] ssr_raddr_o,
@@ -155,6 +158,8 @@ module snitch_fp_ss import snitch_pkg::*; #(
   fpnew_pkg::int_format_e int_fmt;
   logic                   vectorial_op;
   logic                   set_dyn_rm;
+  logic [1:0]             scale_select;
+  logic [1:0]             fmt_select;
 
   logic [2:0][4:0]      fpr_raddr;
   logic [2:0][FLEN-1:0] fpr_rdata;
@@ -329,7 +334,7 @@ module snitch_fp_ss import snitch_pkg::*; #(
     if (fpr_we) sb_d[fpr_waddr] = 1'b0;
     // don't track any dependencies for SSRs if enabled
     if (ssr_active_q) begin
-      for (int i = 0; i < NumSsrs; i++) sb_d[SsrRegs[i]] = 1'b0;
+      for (int i = 0; i < NumMemSsrs; i++) sb_d[SsrRegs[i]] = 1'b0;
     end
   end
 
@@ -356,7 +361,7 @@ module snitch_fp_ss import snitch_pkg::*; #(
   logic is_rd_ssr;
   always_comb begin
     is_rd_ssr = 1'b0;
-    for (int s = 0; s < NumSsrs; s++)
+    for (int s = 0; s < NumMemSsrs; s++)
       is_rd_ssr |= (SsrRegs[s] == rd);
   end
 
@@ -381,6 +386,8 @@ module snitch_fp_ss import snitch_pkg::*; #(
 
     vectorial_op = 1'b0;
     op_mode = 1'b0;
+    scale_select = '0;
+    fmt_select = '0;
 
     fpu_tag_in.rd = rd;
     fpu_tag_in.acc = 1'b0; // RD is on accelerator bus
@@ -1700,6 +1707,36 @@ module snitch_fp_ss import snitch_pkg::*; #(
         set_dyn_rm   = 1'b1;
         if (acc_req_q.data_op inside {riscv_instr::VFNSUMEX_H_B}) op_mode = 1'b1;
       end
+      riscv_instr::MXDOTP_B0,
+      riscv_instr::MXDOTP_B1,
+      riscv_instr::MXDOTP_B2,
+      riscv_instr::MXDOTP_B3: begin
+        fpu_op = fpnew_pkg::MXDOTPF;
+        op_select[0] = RegA;
+        op_select[1] = RegB;
+        op_select[2] = RegDest;
+        fpu_rnd_mode = fpnew_pkg::RNE;
+        src_fmt      = fpnew_pkg::FP8;
+        dst_fmt      = fpnew_pkg::FP32;
+        fmt_select   = acc_req_q.data_op[26:25];
+        if (fmt_select == 2'b00 && fpu_fmt_mode_i.src) begin
+          src_fmt    = fpnew_pkg::FP8ALT;
+        end else if (fmt_select == 2'b01) begin
+          src_fmt    = fpnew_pkg::FP6;
+          if (fpu_fmt_mode_i.src)
+            src_fmt    = fpnew_pkg::FP6ALT;
+        end else if (fmt_select == 2'b10) begin
+          src_fmt    = fpnew_pkg::FP4;
+        end else if (fmt_select == 3'b11) begin
+          int_fmt    = fpnew_pkg::INT8;
+          fpu_op     = fpnew_pkg::MXDOTPI;
+        end
+        if (fpu_fmt_mode_i.dst == 1'b1) begin
+          dst_fmt    = fpnew_pkg::FP16ALT;
+        end
+        vectorial_op = 1'b1;
+        scale_select = acc_req_q.data_op[13:12];
+      end
       // -------------------
       // From float to int
       // -------------------
@@ -2589,16 +2626,20 @@ module snitch_fp_ss import snitch_pkg::*; #(
 
   for (genvar i = 0; i < 3; i++) begin: gen_operand_select
     logic is_raddr_ssr;
+    logic [7:0] scale_a;
+    logic [7:0] scale_b;
     always_comb begin
       is_raddr_ssr = 1'b0;
-      for (int s = 0; s < NumSsrs; s++)
+      for (int s = 0; s < NumMemSsrs; s++)
         is_raddr_ssr |= (SsrRegs[s] == fpr_raddr[i]);
+        if ((fpu_op == fpnew_pkg::MXDOTPF || fpu_op == fpnew_pkg::MXDOTPI) && i==2) is_raddr_ssr = 1'b1;
     end
     always_comb begin
       // Read from any INT RF will be from I2F queue if queues are enabled
       rs_is_int[i] = op_select[i] == AccBus ? en_copift_i : 0;
     end
     always_comb begin
+      ssr_raddr_o[i] = fpr_raddr[i];
       ssr_rvalid_o[i] = 1'b0;
       unique case (op_select[i])
         None: begin
@@ -2614,6 +2655,30 @@ module snitch_fp_ss import snitch_pkg::*; #(
           // map register 0 and 1 to SSRs
           ssr_rvalid_o[i] = ssr_active_q & is_raddr_ssr;
           op[i] = ssr_rvalid_o[i] ? ssr_rdata_i[i] : fpr_rdata[i];
+          if ((fpu_op == fpnew_pkg::MXDOTPF || fpu_op == fpnew_pkg::MXDOTPI) && i==2) begin
+            // special handling of 3rd operand of mxdotp
+            // it is always an SSR and the scale factors are always in the 3rd SSR register
+            ssr_raddr_o[i] = 2;
+            ssr_rvalid_o[i] = ssr_active_q;
+            if (fpu_dual_ssr_i) begin
+              scale_a = ssr_rdata_i[i][7:0];
+              unique case (scale_select)
+                0: scale_b = ssr_rdata_i[i][39:32];
+                1: scale_b = ssr_rdata_i[i][47:40];
+                2: scale_b = ssr_rdata_i[i][55:48];
+                3: scale_b = ssr_rdata_i[i][63:56];
+              endcase
+              op[i] = {{16{1'b0}}, scale_b, scale_a, fpr_rdata[i][31:0]};
+            end else begin
+              unique case (scale_select)
+                0: op[i] = {{16{1'b0}}, ssr_rdata_i[i][15:0],  fpr_rdata[i][31:0]};
+                1: op[i] = {{16{1'b0}}, ssr_rdata_i[i][31:16], fpr_rdata[i][31:0]};
+                2: op[i] = {{16{1'b0}}, ssr_rdata_i[i][47:32], fpr_rdata[i][31:0]};
+                3: op[i] = {{16{1'b0}}, ssr_rdata_i[i][63:48], fpr_rdata[i][31:0]};
+              endcase
+            end
+          end
+
           // The operand is ready if it is not marked in the scoreboard
           // and in case of it being an SSR it need to be ready as well.
           // If scalar chaining is enabled, an operand is ready if it's
@@ -2711,6 +2776,7 @@ module snitch_fp_ss import snitch_pkg::*; #(
     .XF8              (XF8),
     .XF8ALT           (XF8ALT),
     .XFVEC            (XFVEC),
+    .XFMXDOTP         (XFMXDOTP),
     .FLEN             (FLEN),
     .FpuImplementation(FpuImplementation),
     .RegisterFpuReq   (RegisterFpuReq),
@@ -2830,7 +2896,6 @@ module snitch_fp_ss import snitch_pkg::*; #(
 
   // SSRs
   for (genvar i = 0; i < 3; i++) assign ssr_rdone_o[i] = ssr_rvalid_o[i] & acc_req_ready_q;
-  assign ssr_raddr_o = fpr_raddr;
 
   // Counter pipeline.
   logic issue_fpu, issue_core_to_fpu, issue_fpu_seq;

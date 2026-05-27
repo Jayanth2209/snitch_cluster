@@ -81,6 +81,7 @@ module snitch_cc #(
   parameter bit          Xpulpslet          = 0,
   parameter bit          Xpulpvect          = 0,
   parameter bit          Xpulpvectshufflepack = 0,
+  parameter bit          XFMXDOTP           = 0,
   /// Enable Snitch DMA
   parameter bit          Xdma               = 0,
   /// Has `frep` support.
@@ -102,6 +103,7 @@ module snitch_cc #(
   parameter int unsigned NumSequencerInstr = 0,
   parameter int unsigned NumSequencerLoops = 0,
   parameter int unsigned NumSsrs = 0,
+  parameter int unsigned NumMemSsrs = 0, // Number of memory ports for SSRs (different from NumSsrs only for MXDOTP)
   parameter int unsigned SsrMuxRespDepth = 0,
   parameter snitch_ssr_pkg::ssr_cfg_t [NumSsrs-1:0] SsrCfgs = '0,
   parameter logic [NumSsrs-1:0][4:0] SsrRegs = '0,
@@ -143,7 +145,7 @@ module snitch_cc #(
   /// Enable direct compute access (DCA).
   parameter bit          EnableDca          = 0,
   /// Derived parameter *Do not override*
-  localparam int unsigned TCDMPorts = (NumSsrs > 1 ? NumSsrs : 1),
+  localparam int unsigned TCDMPorts = (NumMemSsrs > 1 ? NumMemSsrs : 1),
   localparam type addr_t = logic [AddrWidth-1:0],
   localparam type data_t = logic [DataWidth-1:0],
   // TODO(colluca): this currently does not compile in Verilator (https://github.com/verilator/verilator/issues/6818)
@@ -202,7 +204,7 @@ module snitch_cc #(
 
   // FMA architecture is "merged" -> mulexp and macexp instructions are supported
   localparam bit XFauxMerged  = (FPUImplementation.UnitTypes[3] == fpnew_pkg::MERGED);
-  localparam bit FPEn = RVF | RVD | XF16 | XF16ALT | XF8 | XF8ALT | XFVEC | XFauxMerged | XFDOTP;
+  localparam bit FPEn = RVF | RVD | XF16 | XF16ALT | XF8 | XF8ALT | XFVEC | XFauxMerged | XFDOTP | XFMXDOTP;
   localparam bit Xpulpv2 = Xpulpabs | Xpulpbitop | Xpulpbr | Xpulpclip | Xpulpmacsi | Xpulpminmax |
                            Xpulpslet | Xpulpvect | Xpulpvectshufflepack;
   localparam int unsigned FLEN = RVD     ? 64 : // D ext.
@@ -270,6 +272,7 @@ module snitch_cc #(
 
   fpnew_pkg::roundmode_e fpu_rnd_mode;
   fpnew_pkg::fmt_mode_t  fpu_fmt_mode;
+  logic                  fpu_dual_ssr;
   fpnew_pkg::status_t    fpu_status;
 
   snitch_pkg::core_events_t snitch_events;
@@ -334,6 +337,7 @@ module snitch_cc #(
     .XF8ALT (XF8ALT),
     .XFVEC (XFVEC),
     .XFDOTP (XFDOTP),
+    .XFMXDOTP (XFMXDOTP),
     .XFAUX (XFauxMerged),
     .FLEN (FLEN),
     .CaqDepth (CaqDepth),
@@ -386,6 +390,7 @@ module snitch_cc #(
     .ptw_is_4mega_i (hive_rsp_i.ptw_is_4mega),
     .fpu_rnd_mode_o ( fpu_rnd_mode ),
     .fpu_fmt_mode_o ( fpu_fmt_mode ),
+    .fpu_dual_ssr_o ( fpu_dual_ssr ),
     .fpu_status_i ( fpu_status ),
     .core_events_o ( snitch_events),
     .barrier_o ( barrier_o ),
@@ -648,6 +653,7 @@ module snitch_cc #(
       .NumFPUSequencerLoops (NumSequencerLoops),
       .FpuImplementation (FPUImplementation),
       .NumSsrs (NumSsrs),
+      .NumMemSsrs (NumMemSsrs),
       .SsrRegs (SsrRegs),
       .dreq_t (dreq_t),
       .drsp_t (drsp_t),
@@ -666,6 +672,7 @@ module snitch_cc #(
       .XF8 (XF8),
       .XF8ALT (XF8ALT),
       .XFVEC (XFVEC),
+      .XFMXDOTP (XFMXDOTP),
       .FLEN (FLEN),
       .EnableDca (EnableDca)
     ) i_snitch_fp_ss (
@@ -694,6 +701,7 @@ module snitch_cc #(
       .data_rsp_i       ( fpu_drsp       ),
       .fpu_rnd_mode_i   ( fpu_rnd_mode   ),
       .fpu_fmt_mode_i   ( fpu_fmt_mode   ),
+      .fpu_dual_ssr_i   ( fpu_dual_ssr   ),
       .fpu_status_o     ( fpu_status     ),
       .ssr_raddr_o      ( ssr_raddr      ),
       .ssr_rdata_i      ( ssr_rdata      ),
@@ -859,8 +867,8 @@ module snitch_cc #(
   // SSRs
   // ----
   if (Xssr) begin : gen_ssrs
-    tcdm_req_t [NumSsrs-1:0] ssr_req;
-    tcdm_rsp_t [NumSsrs-1:0] ssr_rsp;
+    tcdm_req_t [NumMemSsrs-1:0] ssr_req;
+    tcdm_rsp_t [NumMemSsrs-1:0] ssr_rsp;
     tcdm_req_t tcdm_req;
     tcdm_rsp_t tcdm_rsp;
 
@@ -945,7 +953,9 @@ module snitch_cc #(
     `ASSERT_INIT(CheckSsrWithXssr, NumSsrs >= 1);
 
     snitch_ssr_streamer #(
+      .XFMXDOTP (XFMXDOTP),
       .NumSsrs (NumSsrs),
+      .NumMemSsrs (NumMemSsrs),
       .RPorts (3),
       .WPorts (1),
       .SsrCfgs (SsrCfgs),
@@ -978,12 +988,13 @@ module snitch_cc #(
       .mem_rsp_i      ( ssr_rsp    ),
       .streamctl_done_o   ( ssr_streamctl_done  ),
       .streamctl_valid_o  ( ssr_streamctl_valid ),
-      .streamctl_ready_i  ( ssr_streamctl_ready )
+      .streamctl_ready_i  ( ssr_streamctl_ready ),
+      .dual_ssr_en_i  ( fpu_dual_ssr )
     );
 
-  if (NumSsrs > 1) begin : gen_multi_ssr
-    assign ssr_rsp = {tcdm_rsp_i[NumSsrs-1:1], tcdm_rsp};
-    assign {tcdm_req_o[NumSsrs-1:1], tcdm_req} = ssr_req;
+  if (NumMemSsrs > 1) begin : gen_multi_ssr
+    assign ssr_rsp = {tcdm_rsp_i[NumMemSsrs-1:1], tcdm_rsp};
+    assign {tcdm_req_o[NumMemSsrs-1:1], tcdm_req} = ssr_req;
   end else begin : gen_one_ssr
     assign ssr_rsp = tcdm_rsp;
     assign tcdm_req = ssr_req;
