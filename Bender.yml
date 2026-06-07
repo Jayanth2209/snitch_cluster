@@ -28,10 +28,10 @@ dependencies:
   riscv-dbg: 0.8.1
   cluster_icache: 0.3.0
   idma: 0.6.5
-  axi:                { git: https://github.com/colluca/axi.git,                      rev:      multicast   }
-  common_cells:       { git: https://github.com/pulp-platform/common_cells.git,       rev:      snitch      }
-  FPnew:              { git: https://github.com/Jayanth2209/cvfpu.git,                rev:      eeb0874de8df8acf493058bf7994ae3383240937 }
-  mxcore:             { path: ../../mxcore/mxcore-rtl/ }
+  axi:                { git: https://github.com/colluca/axi.git,                      rev:      06410c36819924e32db2afa428d244dbdbcd5d4e  }
+  common_cells:       { git: https://github.com/pulp-platform/common_cells.git,       rev:      snitch                                    }
+  FPnew:              { git: https://github.com/Jayanth2209/cvfpu.git,                rev:      bf2100ff68cf736c50b095169d87231a1fa3cc66  }
+  mxcore:             { path: ../../mxcore/mxcore-rtl/                                                                                    }
 
 export_include_dirs:
   - hw/reqrsp_interface/include

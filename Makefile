@@ -10,8 +10,8 @@
 # Makefile invocation #
 #######################
 
-DEBUG        ?= OFF  # ON to turn on debugging symbols and wave logging
-CFG_OVERRIDE ?= $(SN_ROOT)/cfg/mxcore.json  # Override default configuration file
+DEBUG        ?= ON  # ON to turn on debugging symbols and wave logging
+CFG_OVERRIDE ?= $(SN_ROOT)/cfg/mxcore_gwaihir.json  # Override default configuration file
 TECH         ?=      # [gf12, ihp13] for physical simulation
 VCD_DUMP     ?= 0    # 1 to dump VCD traces
 

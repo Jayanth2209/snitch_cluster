@@ -78,6 +78,7 @@ module cluster_tile
     .msip_i,
     .hart_base_id_i,
     .cluster_base_addr_i,
+    .cluster_base_offset_i (snitch_cluster_pkg::CfgClusterBaseOffset),
     .mxip_i           (mxip),
     .clk_d2_bypass_i  ('0),
     .sram_cfgs_i,
@@ -89,10 +90,24 @@ module cluster_tile
     .wide_out_resp_i  (cluster_wide_out_resp_i), // chimney?
     .wide_in_req_i    (cluster_wide_in_req_i), // chimney?
     .wide_in_resp_o   (cluster_wide_in_resp_o), // chimney?
-    .narrow_ext_req_o (cluster_narrow_ext_req), // AXI DW converter -> AXI cut -> AXI to TCDM -> HWPE
-    .narrow_ext_resp_i(cluster_narrow_ext_rsp), // AXI DW converter -> AXI cut -> AXI to TCDM -> HWPE
-    .tcdm_ext_req_i   (cluster_tcdm_ext_req), // to HWPE
-    .tcdm_ext_resp_o  (cluster_tcdm_ext_rsp) // to HWPE
+    .narrow_ext_req_o  (cluster_narrow_ext_req),
+    .narrow_ext_resp_i (cluster_narrow_ext_rsp),
+    .tcdm_ext_req_i    (cluster_tcdm_ext_req),
+    .tcdm_ext_resp_o   (cluster_tcdm_ext_rsp),
+    .dca_req_i         ('0),
+    .dca_rsp_o         (),
+    .x_issue_req_o     (),
+    .x_issue_resp_i    ('0),
+    .x_issue_valid_o   (),
+    .x_issue_ready_i   ('0),
+    .x_register_o      (),
+    .x_register_valid_o(),
+    .x_register_ready_i('0),
+    .x_commit_o        (),
+    .x_commit_valid_o  (),
+    .x_result_i        ('0),
+    .x_result_valid_i  ('0),
+    .x_result_ready_o  ()
   );
 
   // Convert narrow AXI's 64 bit DW down to 32
