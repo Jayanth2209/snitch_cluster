@@ -62,6 +62,15 @@ packages:
     source:
       Git: https://github.com/pulp-platform/common_verification.git
     dependencies: []
+  datamover:
+    revision: 5df9c9bd9e10ad020763c4291c571adf35ef4ae2
+    version: null
+    source:
+      Git: https://github.com/pulp-platform/datamover.git
+    dependencies:
+    - hci
+    - hwpe-ctrl
+    - hwpe-stream
   fpnew:
     revision: bf2100ff68cf736c50b095169d87231a1fa3cc66
     version: null

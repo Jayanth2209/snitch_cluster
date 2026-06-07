@@ -83,12 +83,6 @@
     },
     external_addr_regions: [
         {
-            name: "l2spm",
-            address: 0x70000000,
-            length: 0x10000000,
-            cacheable: true
-        },
-        {
             name: "dram",
             address: 0x80000000,
             length: 0x80000000,
