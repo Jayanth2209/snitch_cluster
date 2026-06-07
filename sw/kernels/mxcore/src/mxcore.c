@@ -30,8 +30,9 @@
 #define MXCORE_ACQUIRE 0x04
 #define MXCORE_STATUS 0x0C
 #define MXCORE_SOFT_CLEAR 0x14
+#define MXCORE_EVT_OFFS 0x94
 #define MXCORE_CK_GATE_OFFS 0x9C
-#define HWPE_MXIP_ADDR (HWPE_ADDR_BASE + 0x58)
+#define HWPE_MXIP_ADDR (HWPE_ADDR_BASE + MXCORE_EVT_OFFS)
 #define HWPE_WRITE(value, offset) *(volatile int *)(HWPE_ADDR_BASE + offset) = value
 #define HWPE_READ(offset) *(volatile int *)(HWPE_ADDR_BASE + offset)
 
