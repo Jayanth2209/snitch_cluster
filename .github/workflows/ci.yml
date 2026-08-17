@@ -48,6 +48,11 @@ jobs:
             git fetch https://github.com/pulp-platform/snitch_cluster.git main
             sha="$(git merge-base FETCH_HEAD HEAD)"
           fi
+          # Handle null SHA (e.g. first push to a branch) by falling back to
+          # the first parent of HEAD so changed-files can find a valid ref.
+          if [ -z "$sha" ] || [ "$sha" = "0000000000000000000000000000000000000000" ]; then
+            sha="$(git rev-parse HEAD^1 2>/dev/null || git rev-parse HEAD)"
+          fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "Base SHA: $sha"
 
