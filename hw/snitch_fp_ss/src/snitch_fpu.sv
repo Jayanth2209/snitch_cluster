@@ -81,6 +81,8 @@ module snitch_fpu import snitch_pkg::*; #(
     .vectorial_op_i(fpu_req.q.vectorial_op),
     .tag_i         (fpu_req.q.tag),
     .simd_mask_i   ('1),
+    .pace_param_i  ('0),
+    .pace_mode_i   ('0),
     .in_valid_i    (fpu_req.q_valid),
     .in_ready_o    (fpu_rsp.q_ready),
     .flush_i       (1'b0),
